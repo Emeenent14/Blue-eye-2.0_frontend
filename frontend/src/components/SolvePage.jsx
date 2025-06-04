@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import './SolvePage.css';
 
 const MAX_ATTEMPTS = 5;
 const ATTEMPTS_KEY = 'solve_attempts';
@@ -14,6 +15,7 @@ const SolvePage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [attemptsLeft, setAttemptsLeft] = useState(MAX_ATTEMPTS);
+  const [dragOver, setDragOver] = useState(false);
 
   // Initialize and load attempts counter from localStorage
   useEffect(() => {
@@ -53,6 +55,32 @@ const SolvePage = () => {
     // Clear previous results
     setSolution('');
     setError('');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+        setSolution('');
+        setError('');
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -100,51 +128,72 @@ const SolvePage = () => {
     }
   };
 
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(solution);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto px-4 py-8">
+    <div className="solve-page">
+      <div className="solve-container">
         <button 
           onClick={() => navigate('/')}
-          className="mb-6 flex items-center text-blue-600 hover:text-blue-800"
+          className="back-button"
         >
-          <span className="mr-2">←</span> Back to Home
+          <span className="back-button-icon">←</span> 
+          Back to Home
         </button>
         
-        <h1 className="text-3xl font-bold mb-8">Solve from Image</h1>
+        <h1 className="solve-title">Solve from Image</h1>
         
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-1">
-              Attempts remaining today: <span className="font-semibold">{attemptsLeft}/{MAX_ATTEMPTS}</span>
-            </p>
+        <div className="upload-card">
+          <div className="attempts-display">
+            <span className="attempts-icon">⚡</span>
+            <span className="attempts-text">Attempts remaining today:</span>
+            <span className="attempts-count">{attemptsLeft}/{MAX_ATTEMPTS}</span>
           </div>
           
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium">
+          <form onSubmit={handleSubmit} className="upload-form">
+            <div className="form-group">
+              <label className="form-label">
                 Upload an image of your problem
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-lg file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-50 file:text-blue-700
-                          hover:file:bg-blue-100"
-              />
+              <div 
+                className={`file-upload-area ${dragOver ? 'drag-over' : ''} ${selectedFile ? 'file-selected' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="file-input-hidden"
+                />
+                <div className="upload-icon">
+                  {selectedFile ? '✅' : '📷'}
+                </div>
+                <div className="upload-text">
+                  {selectedFile ? `Selected: ${selectedFile.name}` : 'Click to upload or drag and drop'}
+                </div>
+                <div className="upload-subtext">
+                  {selectedFile ? 'Click to change file' : 'PNG, JPG, JPEG up to 10MB'}
+                </div>
+              </div>
             </div>
             
             {previewUrl && (
-              <div className="mb-6">
-                <p className="block mb-2 text-sm font-medium">Preview:</p>
+              <div className="preview-section">
+                <span className="preview-label">Preview:</span>
                 <img 
                   src={previewUrl} 
                   alt="Preview" 
-                  className="max-h-64 rounded border border-gray-200" 
+                  className="preview-image"
                 />
               </div>
             )}
@@ -152,37 +201,56 @@ const SolvePage = () => {
             <button
               type="submit"
               disabled={loading || !selectedFile || attemptsLeft <= 0}
-              className={`w-full py-2 px-4 rounded-lg font-medium ${
-                loading || !selectedFile || attemptsLeft <= 0
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              className={`submit-button ${loading || !selectedFile || attemptsLeft <= 0 ? 'disabled' : 'enabled'}`}
             >
-              {loading ? 'Processing...' : 'Solve Problem'}
+              {loading ? (
+                <>
+                  <span className="spinner" style={{marginRight: '0.5rem', width: '1rem', height: '1rem'}}></span>
+                  Processing...
+                </>
+              ) : (
+                'Solve Problem'
+              )}
             </button>
           </form>
         </div>
         
         {loading && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="ml-4 text-gray-600">Processing image and solving problem...</p>
+          <div className="loading-card">
+            <div className="loading-content">
+              <div className="loading-spinner"></div>
+              <div className="loading-text">Processing your image...</div>
+              <div className="loading-subtext">
+                Our AI is analyzing the problem and generating a step-by-step solution for you.
+              </div>
             </div>
           </div>
         )}
         
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-            <h3 className="text-red-800 font-medium mb-2">Error</h3>
-            <p className="text-red-700">{error}</p>
+          <div className="error-alert">
+            <div className="error-title">
+              <span className="error-icon">⚠️</span>
+              Error
+            </div>
+            <div className="error-message">{error}</div>
           </div>
         )}
         
         {solution && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Solution</h2>
-            <div className="whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded border border-gray-200">
+          <div className="solution-card animate-in">
+            <div className="solution-header">
+              <span className="solution-icon">✨</span>
+              <h2 className="solution-title">Solution</h2>
+            </div>
+            <div className="solution-content">
+              <button 
+                className="copy-button"
+                onClick={copyToClipboard}
+                title="Copy to clipboard"
+              >
+                📋 Copy
+              </button>
               {solution}
             </div>
           </div>
